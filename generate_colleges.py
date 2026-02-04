@@ -10,7 +10,7 @@ states = {
     "Rajasthan": ["Jaipur", "Udaipur"],
     "West Bengal": ["Kolkata", "Durgapur"],
     "Telangana": ["Hyderabad", "Warangal"],
-    "Odisha": ["Bhubaneswar","Sambalpur","Balasore","Rourkela"]
+    "Odisha": ["Bhubaneswar","Sambalpur"]
 }
 
 courses_list = ["BTech", "MBA", "BSc", "BCom", "BA", "MBBS", "MTech"]

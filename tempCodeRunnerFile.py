@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
@@ -10,10 +9,6 @@ app = Flask(__name__)
 CORS(app)
 bcrypt = Bcrypt(app)
 SECRET_KEY = "secret123"
-@app.route("/")
-def home():
-    return "Server is working"
-
 
 database.init_db()
 
@@ -70,11 +65,8 @@ def add_college(user):
     if user["role"]!="admin":
         return jsonify({"error":"Unauthorized"}),403
     d=request.json
-    query_db("""
-    INSERT INTO colleges(name,state,city,fees,cutoff,entrance_exam,capacity)
-    VALUES(?,?,?,?,?,?,?)
-    """, (d["name"], d["state"], d["city"], d["fees"], d["cutoff"], d["entrance_exam"], d["capacity"]))
-
+    query_db("INSERT INTO colleges(name,state,course,fees,cutoff) VALUES(?,?,?,?,?)",
+             (d["name"],d["state"],d["course"],d["fees"],d["cutoff"]))
     return jsonify({"status":"college added"})
 
 @app.route("/search_colleges")
@@ -86,15 +78,11 @@ def search():
         conn = sqlite3.connect("colleges.db")
         cur = conn.cursor()
 
-        cur.execute("""  
-    SELECT DISTINCT c.name, c.city, c.state, c.fees, c.entrance_exam, c.capacity, cr.course_name
-    FROM colleges c
-    JOIN college_courses cc ON c.id = cc.college_id
-    JOIN courses cr ON cr.id = cc.course_id
-    WHERE REPLACE(LOWER(cr.course_name), ' ', '') LIKE REPLACE(LOWER(?), ' ', '')
-    AND c.fees <= ?
-""", (f"%{course}%", max_fees))
-
+        cur.execute("""
+            SELECT name, city, state, courses, fees, entrance_exam, capacity
+            FROM colleges
+            WHERE courses LIKE ? AND fees <= ?
+        """, (f"%{course}%", max_fees))
 
         rows = cur.fetchall()
         conn.close()
@@ -105,10 +93,10 @@ def search():
                 "name": r[0],
                 "city": r[1],
                 "state": r[2],
-                "fees": r[3],
-                "exam": r[4],
-                "capacity": r[5],
-                "courses": r[6]
+                "courses": r[3],
+                "fees": r[4],
+                "exam": r[5],
+                "capacity": r[6]
             })
 
         return jsonify(result)
@@ -117,32 +105,17 @@ def search():
         return jsonify({"error": str(e)})
 
 
-
-
 @app.route("/chatbot", methods=["POST"])
 def chatbot():
-    try:
-        msg = request.json.get("message", "").lower()
+    msg = request.json["message"].lower()
+    if "engineering" in msg:
+        reply = "You can pursue BTech or Diploma Engineering."
+    elif "medical" in msg:
+        reply = "Options include MBBS, BDS, BSc Nursing."
+    else:
+        reply = "Ask about careers, colleges, or courses."
+    return jsonify({"reply": reply})
 
-        if "mca" in msg:
-            reply = "MCA is a Master's in Computer Applications."
-        elif "bca" in msg:
-            reply = "BCA is Bachelor of Computer Applications."
-        elif "btech" in msg:
-            reply = "BTech is a 4-year engineering program."
-        elif "kiit" in msg:
-            reply = "KIIT Bhubaneswar is a top private university in India."
-        elif "phd" in msg:
-            reply = "PhD is a doctoral research degree."
-        else:
-            reply = "Ask about MCA, BCA, BTech, PhD or KIIT."
 
-        return jsonify({"reply": reply})
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
-    
-print("REGISTERED ROUTES:")
-print(app.url_map)
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000, debug=True)
+    app.run(host="0.0.0.0", port=10000)

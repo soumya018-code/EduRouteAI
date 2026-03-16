@@ -76,49 +76,64 @@ def add_college(user):
     """, (d["name"], d["state"], d["city"], d["fees"], d["cutoff"], d["entrance_exam"], d["capacity"]))
 
     return jsonify({"status":"college added"})
+    cur.execute(query, (f"%{course}%", fees))
+
+    rows = cur.fetchall()
+    conn.close()
 
 @app.route("/search_colleges")
-def search():
-    try:
-        course = request.args.get("course", "")
-        max_fees = int(request.args.get("fees", 999999))
+def search_colleges():
 
-        conn = sqlite3.connect("colleges.db")
-        cur = conn.cursor()
+    course = request.args.get("course", "").lower()
+    fees = int(request.args.get("fees", 99999999))
+    state = request.args.get("state", "").lower()
 
-        cur.execute("""  
-    SELECT DISTINCT c.name, c.city, c.state, c.fees, c.entrance_exam, c.capacity, cr.course_name
-    FROM colleges c
-    JOIN college_courses cc ON c.id = cc.college_id
-    JOIN courses cr ON cr.id = cc.course_id
-    WHERE REPLACE(LOWER(cr.course_name), ' ', '') LIKE REPLACE(LOWER(?), ' ', '')
-    AND c.fees <= ?
-""", (f"%{course}%", max_fees))
+    conn = sqlite3.connect("colleges.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
+    query = """
+    SELECT 
+        colleges.name,
+        colleges.city,
+        colleges.state,
+        courses.course_name AS courses,
+        college_courses.fees,
+        college_courses.capacity,
+        colleges.entrance_exam AS exam
+    FROM colleges
+    JOIN college_courses
+        ON colleges.id = college_courses.college_id
+    JOIN courses
+        ON courses.id = college_courses.course_id
+    WHERE 1=1
+    """
 
-        rows = cur.fetchall()
-        conn.close()
+    params = []
 
-        result = []
-        for r in rows:
-            result.append({
-                "name": r[0],
-                "city": r[1],
-                "state": r[2],
-                "fees": r[3],
-                "exam": r[4],
-                "capacity": r[5],
-                "courses": r[6]
-            })
+    # course filter
+    if course:
+        query += " AND LOWER(courses.course_name) LIKE ?"
+        params.append(f"%{course}%")
 
-        return jsonify(result)
+    # fee filter
+    query += " AND college_courses.fees <= ?"
+    params.append(fees)
 
-    except Exception as e:
-        return jsonify({"error": str(e)})
+    # state filter
+    if state and state != "any":
+        query += " AND LOWER(colleges.state) LIKE ?"
+        params.append(f"%{state}%")
 
+    query += " LIMIT 50"
 
+    cur.execute(query, params)
 
+    rows = cur.fetchall()
+    conn.close()
 
+    return jsonify([dict(r) for r in rows])
+    
 @app.route("/chatbot", methods=["POST"])
 def chatbot():
     try:
